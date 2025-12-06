@@ -1,22 +1,25 @@
 import express from "express";
-import { createServer } from "node:http";
-import socketIOOptions from "./socket.io/option";
+import http from "node:http";
 import { Server } from "socket.io";
+import socketIOOptions from "./socket.io/option";
+import { registerRandomChatNamespace } from "./chat/random-chat/index";
 import dotenv from "dotenv";
-import tryEnv from "./util/tryEnv";
 dotenv.config();
 
-const PORT = tryEnv("PORT", "8888");
-
+const PORT = Number(process.env.PORT) || 8888;
 const app = express();
-const httpServer = createServer(app);
-const io = new Server(httpServer, socketIOOptions);
+const server = http.createServer(app);
+const io = new Server(server, socketIOOptions);
 
-
-io.on("connection", (socket) => {
-  // ...
+app.get("/health", (req: express.Request, res: express.Response) => {
+  res.status(200).send("OK");
 });
 
-httpServer.listen(PORT, () => {
-  console.log(`Server is listening on port ${PORT}`);
+// Namespaces
+registerRandomChatNamespace(io);
+
+server.listen(PORT, () => {
+  console.log(`API server is running on port ${PORT}`);
 });
+
+export default app;

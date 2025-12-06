@@ -6,7 +6,7 @@ import { registerRandomChatNamespace } from "./chat/random-chat/index";
 import dotenv from "dotenv";
 dotenv.config();
 
-const PORT = Number(process.env.PORT) || 8888;
+const PORT = Number(process.env.PORT) || 8080;
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, socketIOOptions);

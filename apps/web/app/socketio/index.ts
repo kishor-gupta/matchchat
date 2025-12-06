@@ -42,13 +42,13 @@ export interface MatchChatPayloads {
   "chatroom:leave": { roomId: string };
 }
 
-const path = "http://localhost:8080/random-chat";
+const path = "http://localhost:8080";
 const NAMESPACE_RANDOM_CHAT = "/random-chat";
 
 export { NAMESPACE_RANDOM_CHAT };
 
 const initializeConnection = () => {
-  const socket: ExtendedSocket = io(path, {
+  const socket: ExtendedSocket = io(path + NAMESPACE_RANDOM_CHAT, {
     autoConnect: false,
     // transports: ["websocket"],
   }) as ExtendedSocket;

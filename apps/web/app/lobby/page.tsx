@@ -1,6 +1,58 @@
-import React from 'react'
+"use client";
+import React, { useEffect, useRef, useState } from 'react';
+import { initializeConnection } from '../socketio';
 
 export default function LobbyPage() {
+    const socketRef = useRef<ReturnType<typeof initializeConnection> | null>(null);
+    const [messages, setMessages] = useState<Array<{ from: string; text: string }>>([]);
+    const [paired, setPaired] = useState<{ peerId: string; roomId?: string } | null>(null);
+    const [input, setInput] = useState('');
+
+    useEffect(() => {
+        const socket = initializeConnection();
+        socketRef.current = socket;
+
+        socket.on('connect', () => {
+            socket.emit('join');
+        });
+
+        socket.on('waiting', () => {
+            console.log('Waiting for a peer to connect...',socket.id);
+            setPaired(null);
+        });
+
+        socket.on('paired', (data: { peerId: string; roomId?: string }) => {
+            console.log('Paired with peer:', data.peerId);
+            setPaired(data);
+        });
+
+        socket.on('message', (payload: { from: string; text: string }) => {
+            setMessages((prev) => [...prev, payload]);
+        });
+
+        return () => {
+            socket.off('waiting');
+            socket.off('paired');
+            socket.off('message');
+            socket.disconnect();
+        };
+    }, []);
+
+    const handleSend = () => {
+        const text = input.trim();
+        if (!text || !socketRef.current) return;
+        socketRef.current.emit('message', { text });
+        setMessages((prev) => [...prev, { from: 'me', text }]);
+        setInput('');
+    };
+
+    const handleLeave = () => {
+        socketRef.current?.emit('leave');
+        setPaired(null);
+        setMessages([]);
+    };
+    console.log('Rendered with paired:', socketRef.current);
+
     return (
         <div className="min-h-screen bg-neutral-50 px-4 py-6">
             <div className="mx-auto max-w-6xl grid grid-cols-2 gap-2 md:grid-cols-12">
@@ -10,12 +62,14 @@ export default function LobbyPage() {
 
                         {/* User (Other) */}
                         <div className="flex-1 rounded-xl border border-neutral-200 bg-white shadow-sm flex justify-center items-center">
-                            <div className="p-3 border w-12 h-12 flex justify-center items-center rounded-full">A</div>
+                            {/* <div className="p-3 border w-12 h-12 flex justify-center items-center rounded-full">{paired?.peerId}</div> */}
+                            {paired?.peerId}
                         </div>
 
                         {/* User (You) */}
                         <div className="flex-1 rounded-xl border border-neutral-200 bg-white shadow-sm flex justify-center items-center">
-                            <div className="p-3 border w-12 h-12 flex justify-center items-center rounded-full">B</div>
+                            {/* <div className="p-3 border w-12 h-12 flex justify-center items-center rounded-full">{socketRef.current?.id}</div> */}
+                            {socketRef.current?.id} - YOU
                         </div>
 
                     </div>
@@ -30,40 +84,36 @@ export default function LobbyPage() {
                                 {/* <h3 className="text-sm font-semibold text-neutral-800">Connected</h3> */}
                                 {/* <p className="text-xs text-neutral-500">2 participants</p> */}
                             </div>
-                            <button className="rounded-md border border-neutral-200 px-3 py-1 text-sm text-white hover:bg-neutral-50 bg-red-500" type='button'>
-                                Leave
+                            <button className="rounded-md border border-neutral-200 px-3 py-1 text-sm text-white hover:bg-neutral-50 bg-red-500" type='button' onClick={handleLeave}>
+                                {paired ? 'Leave' : 'Waiting'}
                             </button>
                         </div>
 
                         {/* Messages */}
                         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
-                            <div className="flex gap-3">
-                                <div className="h-8 w-8 shrink-0 rounded-full bg-neutral-200" />
-                                <div className="max-w-[70%] rounded-lg bg-neutral-100 px-3 py-2">
-                                    <p className="text-sm text-neutral-800">Hey! Ready to match?</p>
-                                    <span className="mt-1 block text-[10px] text-neutral-500">09:20</span>
+                            {messages.map((m, idx) => (
+                                <div key={idx} className={`flex gap-3 ${m.from === 'me' ? 'justify-end' : ''}`}>
+                                    {m.from !== 'me' && <div className="h-8 w-8 shrink-0 rounded-full bg-neutral-200" />}
+                                    <div className={`max-w-[70%] rounded-lg px-3 py-2 ${m.from === 'me' ? 'bg-rose-100' : 'bg-neutral-100'}`}>
+                                        <p className="text-sm text-neutral-800">{m.text}</p>
+                                    </div>
+                                    {m.from === 'me' && <div className="h-8 w-8 shrink-0 rounded-full bg-neutral-200" />}
                                 </div>
-                            </div>
-
-                            <div className="flex justify-end gap-3">
-                                <div className="max-w-[70%] rounded-lg bg-rose-100 px-3 py-2">
-                                    <p className="text-sm text-neutral-800">Yes, let's start!</p>
-                                    <span className="mt-1 block text-[10px] text-neutral-500">09:21</span>
-                                </div>
-                                <div className="h-8 w-8 shrink-0 rounded-full bg-neutral-200" />
-                            </div>
+                            ))}
                         </div>
 
                         {/* Composer */}
                         <div className="border-t border-neutral-200 p-3">
-                            <form className="flex items-center gap-2">
+                            <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); handleSend(); }}>
                                 <input
                                     type="text"
+                                    value={input}
+                                    onChange={(e) => setInput(e.target.value)}
                                     placeholder="Type a message"
                                     className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-600"
                                 />
                                 <button
-                                    type="button"
+                                    type="submit"
                                     className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-800"
                                 >
                                     Send

@@ -1,15 +1,21 @@
 "use client"
+
 import React from 'react'
 import { initializeConnection } from '../socketio';
+import { useRouter } from 'next/navigation';
+
 
 function StartChatComponent() {
+    const router = useRouter();
     const handleStartChat = () => {
         console.log("Start chat button clicked");
 
         const socket = initializeConnection();
         socket.on("connect", () => {
-            socket.emit("join");
-            console.log("Connected to the server with ID:", socket.id);
+            if (socket.connected) {
+                socket.emit("join");
+                router.push('/lobby');
+            }
         });
     };
 

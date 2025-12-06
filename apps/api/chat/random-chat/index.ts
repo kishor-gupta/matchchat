@@ -7,39 +7,81 @@ export type RandomChatEvents = {
 };
 
 class RandomChatLobby {
-  private waiting: Socket[] = [];
-  private pairs: Map<string, string> = new Map();
+  private waiting: Set<string> = new Set();
+  private socketById: Map<string, Socket> = new Map();
+  private roomBySocket: Map<string, string> = new Map();
 
   add(socket: Socket) {
-    if (this.waiting.length > 0) {
-      const peer = this.waiting.shift()!;
-      this.pairs.set(socket.id, peer.id);
-      this.pairs.set(peer.id, socket.id);
-      socket.emit("paired", { peerId: peer.id });
-      peer.emit("paired", { peerId: socket.id });
-    } else {
-      this.waiting.push(socket);
-      socket.emit("waiting");
+    this.socketById.set(socket.id, socket);
+    this.waiting.add(socket.id);
+    socket.emit("waiting");
+    this.tryPair();
+  }
+
+  tryPair() {
+    if (this.waiting.size < 2) return false;
+    const ids = Array.from(this.waiting);
+    const aId = ids[0];
+    const bId = ids[1];
+    const a = this.socketById.get(aId);
+    const b = this.socketById.get(bId);
+    if (!a || !b) return false;
+
+    this.waiting.delete(aId);
+    this.waiting.delete(bId);
+
+    const roomId = `room:${a.id}:${b.id}`;
+    this.roomBySocket.set(a.id, roomId);
+    this.roomBySocket.set(b.id, roomId);
+
+    a.join(roomId);
+    b.join(roomId);
+
+    a.emit("paired", { peerId: b.id, roomId });
+    b.emit("paired", { peerId: a.id, roomId });
+    return true;
+  }
+
+  leaveRoom(socket: Socket, requeue = true) {
+    const roomId = this.roomBySocket.get(socket.id);
+    if (!roomId) return;
+    socket.leave(roomId);
+    this.roomBySocket.delete(socket.id);
+    const peerId = Array.from(this.roomBySocket.keys()).find(
+      (sid) => sid !== socket.id && this.roomBySocket.get(sid) === roomId
+    );
+    if (peerId) {
+      this.roomBySocket.delete(peerId);
+      const peer = this.socketById.get(peerId);
+      peer?.leave(roomId);
+      peer?.emit("peer:left");
+      if (requeue && peer) this.add(peer);
     }
+    if (requeue) this.add(socket);
   }
 
   remove(socket: Socket) {
-    this.waiting = this.waiting.filter((s) => s.id !== socket.id);
-    const peerId = this.pairs.get(socket.id);
-    if (peerId) {
-      this.pairs.delete(socket.id);
-      this.pairs.delete(peerId);
-    }
+    this.waiting.delete(socket.id);
+    this.socketById.delete(socket.id);
+    this.leaveRoom(socket, false);
   }
 
   getPeer(socket: Socket): Socket | undefined {
-    const peerId = this.pairs.get(socket.id);
-    if (!peerId) return undefined;
-    return socket.nsp.sockets.get(peerId);
+    const roomId = this.roomBySocket.get(socket.id);
+    if (!roomId) return undefined;
+    const peerId = Array.from(this.socketById.keys()).find(
+      (sid) => sid !== socket.id && this.roomBySocket.get(sid) === roomId
+    );
+    return peerId ? this.socketById.get(peerId) : undefined;
   }
 
   getRecord() {
-    return [{ pair: this.pairs, waiting: this.waiting }];
+    return [
+      {
+        waiting: JSON.stringify(Array.from(this.waiting)),
+        rooms: JSON.stringify(Array.from(this.roomBySocket.entries())),
+      },
+    ];
   }
 }
 
@@ -55,21 +97,24 @@ export function registerRandomChatNamespace(io: Server) {
     });
 
     socket.on("leave", () => {
-      lobby.remove(socket);
-      socket.disconnect(true);
+      lobby.leaveRoom(socket);
     });
 
     socket.on("message", (payload: { text: string }) => {
-      const peer = lobby.getPeer(socket);
-      if (peer) {
-        peer.emit("message", { from: socket.id, text: payload.text });
+      const roomId =
+        socket.rooms.size > 1
+          ? Array.from(socket.rooms).find((r) => r.startsWith("room:"))
+          : undefined;
+      if (roomId) {
+        socket
+          .to(roomId)
+          .emit("message", { from: socket.id, text: payload.text });
       } else {
         socket.emit("error", { message: "No peer connected" });
       }
     });
 
     socket.on("disconnect", () => {
-      console.log(`Socket disconnected: ${socket.id}`);
       lobby.remove(socket);
     });
   });

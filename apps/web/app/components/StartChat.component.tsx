@@ -8,8 +8,6 @@ import { useRouter } from 'next/navigation';
 function StartChatComponent() {
     const router = useRouter();
     const handleStartChat = () => {
-        console.log("Start chat button clicked");
-
         const socket = initializeConnection();
         socket.on("connect", () => {
             if (socket.connected) {

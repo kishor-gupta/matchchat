@@ -20,12 +20,12 @@ export function initializeConnection() {
     }) as ExtendedSocket;
 
     socket.on("connect", () => {
-      console.log("🔥 Socket Connected:", socket!.id);
+      // console.log("🔥 Socket Connected:", socket!.id);
     });
 
-    console.log("🛠 Socket instance created (id pending...)");
+    // console.log("🛠 Socket instance created (id pending...)");
   } else {
-    console.log("♻ Reusing existing socket (cached). id:", socket.id);
+    // console.log("♻ Reusing existing socket (cached). id:", socket.id);
   }
 
   return socket;

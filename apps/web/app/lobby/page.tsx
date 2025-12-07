@@ -19,8 +19,6 @@ export default function LobbyPage() {
             socketRef.current!.emit('join');
         });
 
-        console.log('Setting up socketRef event listeners for lobby page', socketRef.current.id);
-
         socketRef.current.on('waiting', () => {
             setPaired(null);
         });
@@ -61,9 +59,9 @@ export default function LobbyPage() {
 
     return (
         <div className="min-h-screen bg-neutral-50 px-4 py-6">
-            <div className="mx-auto max-w-6xl grid grid-cols-2 gap-2 md:grid-cols-12">
+            <div className="mx-auto max-w-6xl grid grid-cols-1 gap-3 md:grid-cols-12">
                 {/* Left: Participants Card */}
-                <aside className="md:col-span-3">
+                <aside className="order-2 md:order-1 md:col-span-3">
                     <div className="h-[70vh] flex flex-col gap-4">
 
                         {/* User (Other) */}
@@ -82,8 +80,8 @@ export default function LobbyPage() {
                 </aside>
 
                 {/* Middle: Chat Area */}
-                <main className="md:col-span-6">
-                    <div className="flex h-[70vh] flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+                <main className="order-1 md:order-2 md:col-span-6">
+                    <div className="flex md:h-[70vh] h-[80vh] flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
                         {/* Chat header */}
                         <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
                             <div>

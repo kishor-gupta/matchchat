@@ -2,7 +2,7 @@ import React from 'react'
 
 function FooterComponent() {
     return (
-        <div className='flex justify-evenly items-center'>
+        <div className='flex justify-evenly items-center md:flex-row flex-col bg-neutral-100 text-neutral-600 text-sm'>
 
             <div aria-label='declaration'>
                 <div aria-label='copyright' className=''>

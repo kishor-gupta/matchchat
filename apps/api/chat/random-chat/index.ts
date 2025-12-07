@@ -93,7 +93,7 @@ export function registerRandomChatNamespace(io: Server) {
   nsp.on("connection", (socket: Socket) => {
     socket.on("join", () => {
       lobby.add(socket);
-      console.log(lobby.getRecord());
+      // console.log(lobby.getRecord());
       socket.broadcast.emit("onlineClient", {
         count: lobby["socketById"].size,
       });
@@ -119,7 +119,7 @@ export function registerRandomChatNamespace(io: Server) {
     });
 
     socket.on("disconnect", () => {
-      console.log(`Socket disconnected: ${socket.id}`);
+      // console.log(`Socket disconnected: ${socket.id}`);
       socket.broadcast.emit("onlineClient", {
         count: lobby["socketById"].size - 1,
       });

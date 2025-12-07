@@ -115,6 +115,7 @@ export function registerRandomChatNamespace(io: Server) {
     });
 
     socket.on("disconnect", () => {
+      console.log(`Socket disconnected: ${socket.id}`);
       lobby.remove(socket);
     });
   });

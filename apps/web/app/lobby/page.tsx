@@ -6,35 +6,38 @@ export default function LobbyPage() {
     const socketRef = useRef<ReturnType<typeof initializeConnection> | null>(null);
     const [messages, setMessages] = useState<Array<{ from: string; text: string }>>([]);
     const [paired, setPaired] = useState<{ peerId: string; roomId?: string } | null>(null);
+    const [socketId, setSocketId] = useState<string | null>(null);
     const [input, setInput] = useState('');
 
     useEffect(() => {
         const socket = initializeConnection();
         socketRef.current = socket;
 
-        socket.on('connect', () => {
-            socket.emit('join');
+        socketRef.current.on('connect', () => {
+            setSocketId(socketRef.current!.id ?? null);
+            socketRef.current!.emit('join');
         });
 
-        socket.on('waiting', () => {
-            console.log('Waiting for a peer to connect...',socket.id);
+        console.log('Setting up socketRef event listeners for lobby page', socketRef.current.id);
+
+        socketRef.current.on('waiting', () => {
             setPaired(null);
         });
 
-        socket.on('paired', (data: { peerId: string; roomId?: string }) => {
-            console.log('Paired with peer:', data.peerId);
+        socketRef.current.on('paired', (data: { peerId: string; roomId?: string }) => {
             setPaired(data);
         });
 
-        socket.on('message', (payload: { from: string; text: string }) => {
+
+        socketRef.current.on('message', (payload: { from: string; text: string }) => {
             setMessages((prev) => [...prev, payload]);
         });
 
         return () => {
-            socket.off('waiting');
-            socket.off('paired');
-            socket.off('message');
-            socket.disconnect();
+            socketRef.current!.off('waiting');
+            socketRef.current!.off('paired');
+            socketRef.current!.off('message');
+            socketRef.current!.disconnect();
         };
     }, []);
 
@@ -51,7 +54,6 @@ export default function LobbyPage() {
         setPaired(null);
         setMessages([]);
     };
-    console.log('Rendered with paired:', socketRef.current);
 
     return (
         <div className="min-h-screen bg-neutral-50 px-4 py-6">
@@ -69,7 +71,7 @@ export default function LobbyPage() {
                         {/* User (You) */}
                         <div className="flex-1 rounded-xl border border-neutral-200 bg-white shadow-sm flex justify-center items-center">
                             {/* <div className="p-3 border w-12 h-12 flex justify-center items-center rounded-full">{socketRef.current?.id}</div> */}
-                            {socketRef.current?.id} - YOU
+                            {socketId} - YOU
                         </div>
 
                     </div>

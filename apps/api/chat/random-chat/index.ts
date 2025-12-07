@@ -94,6 +94,10 @@ export function registerRandomChatNamespace(io: Server) {
     socket.on("join", () => {
       lobby.add(socket);
       console.log(lobby.getRecord());
+      socket.broadcast.emit("onlineClient", {
+        count: lobby["socketById"].size,
+      });
+      socket.emit("onlineClient", { count: lobby["socketById"].size });
     });
 
     socket.on("leave", () => {
@@ -116,6 +120,9 @@ export function registerRandomChatNamespace(io: Server) {
 
     socket.on("disconnect", () => {
       console.log(`Socket disconnected: ${socket.id}`);
+      socket.broadcast.emit("onlineClient", {
+        count: lobby["socketById"].size - 1,
+      });
       lobby.remove(socket);
     });
   });

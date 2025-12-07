@@ -3,11 +3,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import { initializeConnection } from '../socketio';
 
 export default function LobbyPage() {
-    const socketRef = useRef<ReturnType<typeof initializeConnection> | null>(null);
-    const [messages, setMessages] = useState<Array<{ from: string; text: string }>>([]);
     const [paired, setPaired] = useState<{ peerId: string; roomId?: string } | null>(null);
+    const [messages, setMessages] = useState<Array<{ from: string; text: string }>>([]);
+    const socketRef = useRef<ReturnType<typeof initializeConnection> | null>(null);
     const [socketId, setSocketId] = useState<string | null>(null);
     const [input, setInput] = useState('');
+    const [counter, setCounter] = useState(0);
 
     useEffect(() => {
         const socket = initializeConnection();
@@ -28,9 +29,12 @@ export default function LobbyPage() {
             setPaired(data);
         });
 
-
         socketRef.current.on('message', (payload: { from: string; text: string }) => {
             setMessages((prev) => [...prev, payload]);
+        });
+
+        socketRef.current.on('onlineClient', (data: { count: number }) => {
+            setCounter(data.count);
         });
 
         return () => {
@@ -118,7 +122,7 @@ export default function LobbyPage() {
                                     type="submit"
                                     className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-800"
                                 >
-                                    Send
+                                    Send{counter}
                                 </button>
                             </form>
                         </div>

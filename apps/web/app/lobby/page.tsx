@@ -9,6 +9,16 @@ export default function LobbyPage() {
     const [socketId, setSocketId] = useState<string | null>(null);
     const [input, setInput] = useState('');
     const [counter, setCounter] = useState(0);
+    const messagesEndRef = useRef<null | HTMLDivElement>(null)
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    }
+
+    useEffect(() => {
+        scrollToBottom()
+    }, [messages]);
+    console.log('socketId:', socketId);
 
     useEffect(() => {
         const socket = initializeConnection();
@@ -96,7 +106,7 @@ export default function LobbyPage() {
                         {/* Messages */}
                         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
                             {messages.map((m, idx) => (
-                                <div key={idx} className={`flex gap-3 ${m.from === 'me' ? 'justify-end' : ''}`}>
+                                <div key={idx} ref={messagesEndRef} className={`flex gap-3 ${m.from === 'me' ? 'justify-end' : ''}`}>
                                     {m.from !== 'me' && <div className="h-8 w-8 shrink-0 rounded-full bg-neutral-200" />}
                                     <div className={`max-w-[70%] rounded-lg px-3 py-2 ${m.from === 'me' ? 'bg-rose-100' : 'bg-neutral-100'}`}>
                                         <p className="text-sm text-neutral-800">{m.text}</p>

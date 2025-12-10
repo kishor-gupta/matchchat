@@ -1,7 +1,6 @@
 import tryEnv from "../util/tryEnv";
 
-const redisClientConfig = {
-  url: tryEnv("REDIS_URL", "redis://localhost:6379"),
-};
+const url = tryEnv("REDIS_URL", "testredis");
+const redisClientConfig = { url };
 
 export default redisClientConfig;

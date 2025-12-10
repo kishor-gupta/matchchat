@@ -1,4 +1,6 @@
 /// <reference types="node" />
+import dotenv from "dotenv";
+dotenv.config();
 
 const tryEnv = (key: string, defaultValue: string) => {
   const envValue = process.env[key];

@@ -1,4 +1,5 @@
 import { Server, Socket } from "socket.io";
+import { WaitingManager } from "../../redis/waiting";
 
 export type RandomChatEvents = {
   join: () => void;
@@ -7,28 +8,29 @@ export type RandomChatEvents = {
 };
 
 class RandomChatLobby {
-  private waiting: Set<string> = new Set();
   private socketById: Map<string, Socket> = new Map();
   private roomBySocket: Map<string, string> = new Map();
+  private waitingManager = new WaitingManager();
 
-  add(socket: Socket) {
+  async add(socket: Socket) {
     this.socketById.set(socket.id, socket);
-    this.waiting.add(socket.id);
+    await this.waitingManager.addUserToWaitingList(socket.id);
     socket.emit("waiting");
-    this.tryPair();
+    await this.tryPair();
   }
 
-  tryPair() {
-    if (this.waiting.size < 2) return false;
-    const ids = Array.from(this.waiting);
+  async tryPair() {
+    const list = await this.waitingManager.getWaitingList();
+    if (list.length < 2) return false;
+    const ids = Array.from(list.slice(0, 2));
     const aId = ids[0];
     const bId = ids[1];
     const a = this.socketById.get(aId);
     const b = this.socketById.get(bId);
     if (!a || !b) return false;
 
-    this.waiting.delete(aId);
-    this.waiting.delete(bId);
+    await this.waitingManager.removeUserFromWaitingList(aId);
+    await this.waitingManager.removeUserFromWaitingList(bId);
 
     const roomId = `room:${a.id}:${b.id}`;
     this.roomBySocket.set(a.id, roomId);
@@ -42,7 +44,7 @@ class RandomChatLobby {
     return true;
   }
 
-  leaveRoom(socket: Socket, requeue = true) {
+  async leaveRoom(socket: Socket, requeue = true) {
     const roomId = this.roomBySocket.get(socket.id);
     if (!roomId) return;
     socket.leave(roomId);
@@ -55,15 +57,15 @@ class RandomChatLobby {
       const peer = this.socketById.get(peerId);
       peer?.leave(roomId);
       peer?.emit("peer:left");
-      if (requeue && peer) this.add(peer);
+      if (requeue && peer) await this.add(peer);
     }
-    if (requeue) this.add(socket);
+    if (requeue) await this.add(socket);
   }
 
-  remove(socket: Socket) {
-    this.waiting.delete(socket.id);
+  async remove(socket: Socket) {
+    await this.waitingManager.removeUserFromWaitingList(socket.id);
     this.socketById.delete(socket.id);
-    this.leaveRoom(socket, false);
+    await this.leaveRoom(socket, false);
   }
 
   getPeer(socket: Socket): Socket | undefined {
@@ -75,10 +77,11 @@ class RandomChatLobby {
     return peerId ? this.socketById.get(peerId) : undefined;
   }
 
-  getRecord() {
+  async getRecord() {
+    const data = await this.waitingManager.getWaitingList();
     return [
       {
-        waiting: JSON.stringify(Array.from(this.waiting)),
+        waiting: data,
         rooms: JSON.stringify(Array.from(this.roomBySocket.entries())),
       },
     ];
@@ -91,17 +94,17 @@ export function registerRandomChatNamespace(io: Server) {
   const nsp = io.of("/random-chat");
 
   nsp.on("connection", (socket: Socket) => {
-    socket.on("join", () => {
-      lobby.add(socket);
-      // console.log(lobby.getRecord());
+    socket.on("join", async () => {
+      await lobby.add(socket);
+      await lobby.getRecord();
       socket.broadcast.emit("onlineClient", {
         count: lobby["socketById"].size,
       });
       socket.emit("onlineClient", { count: lobby["socketById"].size });
     });
 
-    socket.on("leave", () => {
-      lobby.leaveRoom(socket);
+    socket.on("leave", async () => {
+      await lobby.leaveRoom(socket);
     });
 
     socket.on("message", (payload: { text: string }) => {

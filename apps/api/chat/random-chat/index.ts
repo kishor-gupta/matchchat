@@ -1,5 +1,5 @@
 import { Server, Socket } from "socket.io";
-import { WaitingManager } from "../../redis/waiting";
+import { WaitingManager } from "../../redis/waiting-manager";
 
 export type RandomChatEvents = {
   join: () => void;

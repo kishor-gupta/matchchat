@@ -1,5 +1,6 @@
 import { Server, Socket } from "socket.io";
 import { WaitingManager } from "../../redis/waiting-manager";
+import { RoomManager } from "../../redis/room-manager";
 
 export type RandomChatEvents = {
   join: () => void;
@@ -9,8 +10,12 @@ export type RandomChatEvents = {
 
 class RandomChatLobby {
   private socketById: Map<string, Socket> = new Map();
-  private roomBySocket: Map<string, string> = new Map();
   private waitingManager = new WaitingManager();
+  private roomManager = new RoomManager();
+
+  get onlineCount() {
+    return this.socketById.size;
+  }
 
   async add(socket: Socket) {
     this.socketById.set(socket.id, socket);
@@ -33,8 +38,8 @@ class RandomChatLobby {
     await this.waitingManager.removeUserFromWaitingList(bId);
 
     const roomId = `room:${a.id}:${b.id}`;
-    this.roomBySocket.set(a.id, roomId);
-    this.roomBySocket.set(b.id, roomId);
+    await this.roomManager.setRoomForSocket(a.id, roomId);
+    await this.roomManager.setRoomForSocket(b.id, roomId);
 
     a.join(roomId);
     b.join(roomId);
@@ -45,15 +50,12 @@ class RandomChatLobby {
   }
 
   async leaveRoom(socket: Socket, requeue = true) {
-    const roomId = this.roomBySocket.get(socket.id);
+    const roomId = await this.roomManager.getRoomForSocket(socket.id);
     if (!roomId) return;
     socket.leave(roomId);
-    this.roomBySocket.delete(socket.id);
-    const peerId = Array.from(this.roomBySocket.keys()).find(
-      (sid) => sid !== socket.id && this.roomBySocket.get(sid) === roomId
-    );
+    await this.roomManager.removeSocketFromRoom(socket.id);
+    const peerId = await this.roomManager.getPeerIdInRoom(socket.id);
     if (peerId) {
-      this.roomBySocket.delete(peerId);
       const peer = this.socketById.get(peerId);
       peer?.leave(roomId);
       peer?.emit("peer:left");
@@ -69,20 +71,16 @@ class RandomChatLobby {
   }
 
   getPeer(socket: Socket): Socket | undefined {
-    const roomId = this.roomBySocket.get(socket.id);
-    if (!roomId) return undefined;
-    const peerId = Array.from(this.socketById.keys()).find(
-      (sid) => sid !== socket.id && this.roomBySocket.get(sid) === roomId
-    );
-    return peerId ? this.socketById.get(peerId) : undefined;
+    return undefined;
   }
 
   async getRecord() {
     const data = await this.waitingManager.getWaitingList();
+    const rooms = await this.roomManager.getRoomsSnapshot();
     return [
       {
         waiting: data,
-        rooms: JSON.stringify(Array.from(this.roomBySocket.entries())),
+        rooms: JSON.stringify(rooms),
       },
     ];
   }
@@ -98,9 +96,9 @@ export function registerRandomChatNamespace(io: Server) {
       await lobby.add(socket);
       await lobby.getRecord();
       socket.broadcast.emit("onlineClient", {
-        count: lobby["socketById"].size,
+        count: lobby.onlineCount,
       });
-      socket.emit("onlineClient", { count: lobby["socketById"].size });
+      socket.emit("onlineClient", { count: lobby.onlineCount });
     });
 
     socket.on("leave", async () => {
@@ -124,7 +122,7 @@ export function registerRandomChatNamespace(io: Server) {
     socket.on("disconnect", () => {
       // console.log(`Socket disconnected: ${socket.id}`);
       socket.broadcast.emit("onlineClient", {
-        count: lobby["socketById"].size - 1,
+        count: Math.max(0, lobby.onlineCount - 1),
       });
       lobby.remove(socket);
     });

@@ -4,8 +4,8 @@ export interface ExtendedSocket extends Socket {
   userId?: string;
 }
 
-// const path = "http://localhost:8080";
-const path = "https://api-production-4691.up.railway.app";
+const path = "http://localhost:8080";
+// const path = "https://api-production-4691.up.railway.app";
 const NAMESPACE_RANDOM_CHAT = "/random-chat";
 
 export { NAMESPACE_RANDOM_CHAT };

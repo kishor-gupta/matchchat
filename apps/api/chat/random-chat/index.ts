@@ -18,71 +18,62 @@ class RandomChatLobby {
   }
 
   async add(socket: Socket) {
-    this.socketById.set(socket.id, socket);
-    await this.waitingManager.addUserToWaitingList(socket.id);
+    const socketId = socket?.id;
+    this.socketById.set(socketId, socket);
+    await this.waitingManager.addUserToWaitingList(socketId);
     socket.emit("waiting");
-    await this.tryPair();
+    await this.tryPair(socketId);
   }
 
-  async tryPair() {
-    const list = await this.waitingManager.getWaitingList();
-    if (list.length < 2) return false;
-    const ids = Array.from(list.slice(0, 2));
-    const aId = ids[0];
-    const bId = ids[1];
-    const a = this.socketById.get(aId);
-    const b = this.socketById.get(bId);
-    if (!a || !b) return false;
+  async tryPair(currentSocketId: string) {
+    const getrandomUser =
+      await this.waitingManager.popRandomUser(currentSocketId);
 
-    await this.waitingManager.removeUserFromWaitingList(aId);
-    await this.waitingManager.removeUserFromWaitingList(bId);
+    if (!getrandomUser) return false;
+    const peerSocket = this.socketById.get(getrandomUser);
+    if (!peerSocket) return false;
+    const currentSocket = this.socketById.get(currentSocketId);
+    if (!currentSocket) return false;
 
-    const roomId = `room:${a.id}:${b.id}`;
-    await this.roomManager.setRoomForSocket(a.id, roomId);
-    await this.roomManager.setRoomForSocket(b.id, roomId);
+    await this.waitingManager.removeUserFromWaitingList(currentSocketId);
+    await this.waitingManager.removeUserFromWaitingList(peerSocket.id);
 
-    a.join(roomId);
-    b.join(roomId);
+    const roomId = `room:${currentSocket.id}:${peerSocket.id}`;
+    await this.roomManager.setRoomForSocket(currentSocket.id, roomId);
+    await this.roomManager.setRoomForSocket(peerSocket.id, roomId);
 
-    a.emit("paired", { peerId: b.id, roomId });
-    b.emit("paired", { peerId: a.id, roomId });
+    currentSocket.join(roomId);
+    peerSocket.join(roomId);
+
+    currentSocket.emit("paired", { peerId: peerSocket.id, roomId });
+    peerSocket.emit("paired", { peerId: currentSocket.id, roomId });
     return true;
   }
 
   async leaveRoom(socket: Socket, requeue = true) {
     const roomId = await this.roomManager.getRoomForSocket(socket.id);
     if (!roomId) return;
-    socket.leave(roomId);
-    await this.roomManager.removeSocketFromRoom(socket.id);
-    const peerId = await this.roomManager.getPeerIdInRoom(socket.id);
-    if (peerId) {
-      const peer = this.socketById.get(peerId);
-      peer?.leave(roomId);
-      peer?.emit("peer:left");
-      if (requeue && peer) await this.add(peer);
-    }
-    if (requeue) await this.add(socket);
+    const getBothSockets = roomId.split(":").slice(1);
+    if (getBothSockets.length !== 2) return;
+
+    await this.roomManager.removeSocketFromRoom(getBothSockets[0]);
+    await this.roomManager.removeSocketFromRoom(getBothSockets[1]);
+
+    await this.add(this.socketById.get(getBothSockets[0]) as Socket);
+    await this.add(this.socketById.get(getBothSockets[1]) as Socket);
+
+    return true;
   }
 
   async remove(socket: Socket) {
-    await this.waitingManager.removeUserFromWaitingList(socket.id);
-    this.socketById.delete(socket.id);
+    const socketId = socket?.id;
+    await this.waitingManager.removeUserFromWaitingList(socketId);
+    this.socketById.delete(socketId);
     await this.leaveRoom(socket, false);
   }
 
   getPeer(socket: Socket): Socket | undefined {
     return undefined;
-  }
-
-  async getRecord() {
-    const data = await this.waitingManager.getWaitingList();
-    const rooms = await this.roomManager.getRoomsSnapshot();
-    return [
-      {
-        waiting: data,
-        rooms: JSON.stringify(rooms),
-      },
-    ];
   }
 }
 
@@ -94,7 +85,7 @@ export function registerRandomChatNamespace(io: Server) {
   nsp.on("connection", (socket: Socket) => {
     socket.on("join", async () => {
       await lobby.add(socket);
-      await lobby.getRecord();
+
       socket.broadcast.emit("onlineClient", {
         count: lobby.onlineCount,
       });

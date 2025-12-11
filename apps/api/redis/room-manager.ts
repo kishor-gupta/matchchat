@@ -4,7 +4,7 @@ export class RoomManager {
   // Map socketId -> roomId
   async setRoomForSocket(socketId: string, roomId: string) {
     await (await redisClient).HSET("socket_room", socketId, roomId);
-    await (await redisClient).SADD(this.membersKey(roomId), socketId);
+    // await (await redisClient).SADD(this.membersKey(roomId), socketId);
   }
 
   async getRoomForSocket(socketId: string): Promise<string | null> {

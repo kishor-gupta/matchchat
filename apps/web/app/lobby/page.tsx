@@ -12,13 +12,18 @@ export default function LobbyPage() {
     const messagesEndRef = useRef<null | HTMLDivElement>(null)
 
     const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+        if (messagesEndRef?.current) {
+            const element = messagesEndRef.current;
+            element.scroll({
+                top: element.scrollHeight,
+                left: 0,
+                behavior: "smooth"
+            })
+        }
     }
 
     useEffect(() => {
-        if (messages.length > 0) {
-            setTimeout(scrollToBottom, 0);
-        }
+        setTimeout(scrollToBottom, 0);
     }, [messages]);
 
     useEffect(() => {
@@ -109,7 +114,7 @@ export default function LobbyPage() {
                         </div>
 
                         {/* Messages */}
-                        <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+                        <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4" ref={messagesEndRef}>
                             {messages.map((m, idx) => (
                                 <div key={idx} className={`flex gap-3 ${m.from === 'me' ? 'justify-end' : ''}`}>
                                     {m.from !== 'me' && <div className="h-8 w-8 shrink-0 rounded-full bg-neutral-200" />}
@@ -119,7 +124,6 @@ export default function LobbyPage() {
                                     {m.from === 'me' && <div className="h-8 w-8 shrink-0 rounded-full bg-neutral-200" />}
                                 </div>
                             ))}
-                            <div ref={messagesEndRef} />
                         </div>
 
                         {/* Composer */}

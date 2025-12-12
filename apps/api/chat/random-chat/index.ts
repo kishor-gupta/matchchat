@@ -18,11 +18,15 @@ class RandomChatLobby {
   }
 
   async add(socket: Socket) {
-    const socketId = socket?.id;
-    this.socketById.set(socketId, socket);
-    await this.waitingManager.addUserToWaitingList(socketId);
-    socket.emit("waiting");
-    await this.tryPair(socketId);
+    try {
+      const socketId = socket?.id;
+      this.socketById.set(socketId, socket);
+      await this.waitingManager.addUserToWaitingList(socketId);
+      socket?.emit("waiting");
+      await this.tryPair(socketId);
+    } catch (error) {
+      console.error("Error in add method:", error);
+    }
   }
 
   async tryPair(currentSocketId: string) {

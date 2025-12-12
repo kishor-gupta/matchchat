@@ -6,7 +6,7 @@ export default function LobbyPage() {
     const [paired, setPaired] = useState<{ peerId: string; roomId?: string } | null>(null);
     const [messages, setMessages] = useState<Array<{ from: string; text: string }>>([]);
     const socketRef = useRef<ReturnType<typeof initializeConnection> | null>(null);
-    const [socketId, setSocketId] = useState<string | null>(null);
+    const [socketId, setSocketId] = useState<string>();
     const [input, setInput] = useState('');
     const [counter, setCounter] = useState(0);
     const messagesEndRef = useRef<null | HTMLDivElement>(null)
@@ -16,16 +16,21 @@ export default function LobbyPage() {
     }
 
     useEffect(() => {
-        scrollToBottom()
+        if (messages.length > 0) {
+            setTimeout(scrollToBottom, 0);
+        }
     }, [messages]);
-    console.log('socketId:', socketId);
+
+    useEffect(() => {
+        console.log("socketId:", socketId);
+    }, [socketId]);
 
     useEffect(() => {
         const socket = initializeConnection();
         socketRef.current = socket;
 
         socketRef.current.on('connect', () => {
-            setSocketId(socketRef.current!.id ?? null);
+            setSocketId(socketRef.current?.id);
             socketRef.current!.emit('join');
         });
 
@@ -46,10 +51,11 @@ export default function LobbyPage() {
         });
 
         return () => {
-            socketRef.current!.off('waiting');
-            socketRef.current!.off('paired');
-            socketRef.current!.off('message');
-            socketRef.current!.disconnect();
+            socketRef.current?.off('waiting');
+            socketRef.current?.off('paired');
+            socketRef.current?.off('message');
+            socketRef.current?.off('onlineClient');
+            socketRef.current?.disconnect();
         };
     }, []);
 
@@ -63,7 +69,6 @@ export default function LobbyPage() {
 
     const handleLeave = () => {
         socketRef.current?.emit('leave');
-        setPaired(null);
         setMessages([]);
     };
 
@@ -106,7 +111,7 @@ export default function LobbyPage() {
                         {/* Messages */}
                         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
                             {messages.map((m, idx) => (
-                                <div key={idx} ref={messagesEndRef} className={`flex gap-3 ${m.from === 'me' ? 'justify-end' : ''}`}>
+                                <div key={idx} className={`flex gap-3 ${m.from === 'me' ? 'justify-end' : ''}`}>
                                     {m.from !== 'me' && <div className="h-8 w-8 shrink-0 rounded-full bg-neutral-200" />}
                                     <div className={`max-w-[70%] rounded-lg px-3 py-2 ${m.from === 'me' ? 'bg-rose-100' : 'bg-neutral-100'}`}>
                                         <p className="text-sm text-neutral-800">{m.text}</p>
@@ -114,6 +119,7 @@ export default function LobbyPage() {
                                     {m.from === 'me' && <div className="h-8 w-8 shrink-0 rounded-full bg-neutral-200" />}
                                 </div>
                             ))}
+                            <div ref={messagesEndRef} />
                         </div>
 
                         {/* Composer */}

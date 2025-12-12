@@ -2,13 +2,18 @@ import redisClient from "./connection";
 
 export class WaitingManager {
   async addUserToWaitingList(userId: string) {
-    (await redisClient).SADD("waiting_list", userId).catch((err) => {
+    if (!userId) {
+      console.error("Error adding user to waiting list: invalid userId", userId);
+      return;
+    }
+    (await redisClient).SADD("waiting_list", String(userId)).catch((err) => {
       console.error("Error adding user to waiting list:", err);
     });
   }
 
   async removeUserFromWaitingList(userId: string) {
-    (await redisClient).SREM("waiting_list", userId);
+    if (!userId) return;
+    (await redisClient).SREM("waiting_list", String(userId));
   }
 
   async getWaitingList(): Promise<string[]> {
@@ -24,8 +29,8 @@ export class WaitingManager {
     let randomUser: any;
     do {
       randomUser = await (await redisClient).SRANDMEMBER("waiting_list");
-    } while (randomUser === currentSocketId);
-      await (await redisClient).SREM("waiting_list", randomUser);
+    } while (!randomUser || randomUser === currentSocketId);
+    await (await redisClient).SREM("waiting_list", String(randomUser));
     return randomUser;
   }
 }
